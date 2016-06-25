@@ -25,7 +25,7 @@ requires = [
 setup(
     name='pyipc-std',
     description='a python ipc tools, use std.',
-    version='1.1.1',
+    version='1.1.2',
     author='duanhongyi',
     author_email='duanhyi@gmail.com',
     packages=find_packages(),
