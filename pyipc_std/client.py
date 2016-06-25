@@ -6,10 +6,10 @@ from subprocess import Popen, PIPE
 
 class StdClient(object):
 
-    def __init__(self, command):
+    def __init__(self, *args):
         self.registered_method_table = {}
         self.is_running = False
-        self.subprocess = Popen(command, stdin=PIPE, stdout=PIPE) 
+        self.subprocess = Popen(args, stdin=PIPE, stdout=PIPE) 
 
     def register_method(self, method_id, method):
         self.registered_method_table[method_id] = method
