@@ -3,7 +3,6 @@ import sys
 import logging
 import pickle
 import struct
-import threading
 
 
 logger = logging.getLogger(__name__)
@@ -54,7 +53,8 @@ class StdServer(object):
     def __del__(self):
         self.close()
 
-    def _patch_std(self):
+    @classmethod
+    def _patch_std(cls):
         sys.stdin = open("/var/log/pyipc-std.in", "w")
         sys.stdout = open("/var/log/pyipc-std.out", "w")
         sys.stderr = open("/var/log/pyipc-std.err", "w")
