@@ -1,48 +1,50 @@
 import struct
 import pickle
 import threading
-from subprocess import Popen, PIPE
+import socket
+import queue
 
 
 class StdClient(object):
 
-    def __init__(self, *args):
+    def __init__(self, fd):
         self.registered_method_table = {}
-        self.is_running = False
-        self.subprocess = Popen(args, stdin=PIPE, stdout=PIPE) 
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.connect(fd) 
+        self.lock = threading.RLock()
 
     def register_method(self, method_id, method):
         self.registered_method_table[method_id] = method
 
     def call_method(self, method_id, *args, **kwargs):
-        data = pickle.dumps({
-            "method_id": method_id,
-            "args": args,
-            "kwargs": kwargs,
-        })
-        self.subprocess.stdin.write(struct.pack('i', len(data)))
-        self.subprocess.stdin.write(data)
-        self.subprocess.stdin.flush()
-
+        try:
+            self.lock.acquire()
+            data = pickle.dumps({
+                "method_id": method_id,
+                "args": args,
+                "kwargs": kwargs,
+            })
+            self.sock.sendall(struct.pack('i', len(data)))
+            self.sock.sendall(data)
+        finally:
+            self.lock.release()
 
     def start(self):
-        self.is_running = True
-        t = threading.Thread(target=self._read_task)
-        t.setDaemon(True)
-        t.start()
+        t1 = threading.Thread(target=self._read_task)
+        t1.setDaemon(True)
+        t1.start()
 
     def close(self):
-        self.is_running = False
-        self.subprocess.terminate()
+        self.sock.close()
     
     def __del__(self):
         self.close()
 
 
     def _read_task(self):
-        while self.is_running:
-            length = struct.unpack('i', self.subprocess.stdout.read(4))[0]
-            data = self.subprocess.stdout.read(length)
+        while True:
+            length = struct.unpack('i', self.sock.recv(4))[0]
+            data = self.sock.recv(length)
             obj = pickle.loads(data)
             method_id = obj["method_id"]
             args = obj["args"]
