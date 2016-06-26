@@ -43,9 +43,14 @@ class StdClient(object):
 
     def _read_task(self):
         while True:
-            length = struct.unpack('i', self.sock.recv(4))[0]
-            data = self.sock.recv(length)
-            obj = pickle.loads(data)
+            buffer = self.sock.recv(4)
+            if not buffer:
+                break
+            length = struct.unpack('i', buffer)[0]
+            buffer = self.sock.recv(length)
+            if not buffer or len(buffer) != length:
+                break
+            obj = pickle.loads(buffer)
             method_id = obj["method_id"]
             args = obj["args"]
             kwargs = obj["kwargs"]

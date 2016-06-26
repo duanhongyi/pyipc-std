@@ -40,19 +40,27 @@ class StdServer(object):
 
 
     def serve_forever(self):
-        self.sock, _ = self.server.accept()
         while True:
-            length = struct.unpack('i', self.sock.recv(4))[0] 
-            data = self.sock.recv(length)
-            obj = pickle.loads(data)
-            method = obj["method_id"]
-            args = obj["args"]
-            kwargs = obj["kwargs"]
-            self.registered_method_table[method](*args, **kwargs)
+            self.sock, _ = self.server.accept()
+            try:
+                while True:
+                    buffer = self.sock.recv(4)
+                    if not buffer:
+                        break
+                    length = struct.unpack('i', buffer)[0] 
+                    buffer = self.sock.recv(length)
+                    if not buffer or len(buffer) != length:
+                        break
+                    obj = pickle.loads(buffer)
+                    method = obj["method_id"]
+                    args = obj["args"]
+                    kwargs = obj["kwargs"]
+                    self.registered_method_table[method](*args, **kwargs)
+            finally:
+                self.sock.close()
 
     def close(self):
-        if self.sock:
-            self.sock.close()
+        self.server.close()
     
     def __del__(self):
         self.close()
