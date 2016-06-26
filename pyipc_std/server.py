@@ -18,6 +18,7 @@ class StdServer(object):
         self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.server.bind(fd)     
         self.server.listen(5) 
+        self.server.settimeout(None)
         self.sock = None
         self.lock = threading.RLock()
 
@@ -42,6 +43,7 @@ class StdServer(object):
     def serve_forever(self):
         while True:
             self.sock, _ = self.server.accept()
+            self.sock.settimeout(None)
             try:
                 while True:
                     buffer = self.sock.recv(4)
