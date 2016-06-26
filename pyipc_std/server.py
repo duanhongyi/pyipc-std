@@ -42,17 +42,13 @@ class StdServer(object):
     def serve_forever(self):
         self.sock, _ = self.server.accept()
         while True:
-            try:
-                length = struct.unpack('i', self.sock.recv(4))[0] 
-                data = self.sock.recv(length)
-                obj = pickle.loads(data)
-                method = obj["method_id"]
-                args = obj["args"]
-                kwargs = obj["kwargs"]
-                self.registered_method_table[method](*args, **kwargs)
-            except struct.error as e:
-                logger.debug(e)
-                break
+            length = struct.unpack('i', self.sock.recv(4))[0] 
+            data = self.sock.recv(length)
+            obj = pickle.loads(data)
+            method = obj["method_id"]
+            args = obj["args"]
+            kwargs = obj["kwargs"]
+            self.registered_method_table[method](*args, **kwargs)
 
     def close(self):
         if self.sock:
