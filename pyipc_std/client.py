@@ -9,6 +9,7 @@ class StdClient(object):
 
     def __init__(self, fd):
         self.registered_method_table = {}
+        self.fd = fd
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.settimeout(None)
         self.lock = threading.RLock()
@@ -30,7 +31,7 @@ class StdClient(object):
             self.lock.release()
 
     def connect(self):
-        self.sock.connect()
+        self.sock.connect(self.fd)
         t1 = threading.Thread(target=self._read_task)
         t1.setDaemon(True)
         t1.start()
