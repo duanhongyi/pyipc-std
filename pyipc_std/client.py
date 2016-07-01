@@ -1,9 +1,12 @@
 import struct
+import time
+import logger
 import pickle
 import threading
 import socket
 import queue
 
+logger = logging.getLogger(__name__)
 
 class StdClient(object):
 
@@ -66,6 +69,9 @@ class StdClient(object):
                 args = obj["args"]
                 kwargs = obj["kwargs"]
                 self.registered_method_table[method_id](*args, **kwargs)
+        except FileNotFoundError as e:
+            logger.exception(e)
+            time.sleep(5)
         finally:
             if not self.is_closed:
                 self.connect()
