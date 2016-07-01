@@ -69,7 +69,7 @@ class StdClient(object):
                 args = obj["args"]
                 kwargs = obj["kwargs"]
                 self.registered_method_table[method_id](*args, **kwargs)
-        except FileNotFoundError as e:
+        except (FileNotFoundError, ConnectionRefusedError) as e:
             logger.exception(e)
             time.sleep(5)
         finally:
