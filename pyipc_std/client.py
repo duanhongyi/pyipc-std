@@ -1,6 +1,6 @@
 import struct
 import time
-import logger
+import logging
 import pickle
 import threading
 import socket
