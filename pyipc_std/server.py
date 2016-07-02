@@ -58,6 +58,8 @@ class StdServer(object):
                     args = obj["args"]
                     kwargs = obj["kwargs"]
                     self.registered_method_table[method](*args, **kwargs)
+            except BaseException as e:
+                logger.exception(e)
             finally:
                 self.sock.close()
 
