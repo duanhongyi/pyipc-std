@@ -73,5 +73,5 @@ class StdClient(object):
             logger.exception(e)
         finally:
             if not self.is_closed:
-                time.sleep(5)
+                time.sleep(1)
                 self.connect()
