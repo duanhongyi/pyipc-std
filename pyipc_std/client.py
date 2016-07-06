@@ -71,7 +71,7 @@ class StdClient(object):
                 self.registered_method_table[method_id](*args, **kwargs)
         except (FileNotFoundError, ConnectionRefusedError) as e:
             logger.exception(e)
-            time.sleep(5)
         finally:
             if not self.is_closed:
+                time.sleep(5)
                 self.connect()
