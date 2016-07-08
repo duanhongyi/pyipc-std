@@ -46,13 +46,14 @@ class StdServer(object):
 
     def serve_forever(self):
         while True:
-            rlist, _, _ =select.select([self.read_fd,],[],[], 60)
-            if not rlist:
+            if not select.select([self.read_fd,],[],[], 99)[0]:
                 continue
             buff = os.read(self.read_fd, 4)
             if not buff:
                 break
             length = struct.unpack('i', buff)[0] 
+            if not select.select([self.read_fd,],[],[], 1)[0]:
+                break
             buff = os.read(self.read_fd, length)
             if not buff or len(buff) != length:
                 break
