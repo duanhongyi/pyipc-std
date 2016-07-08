@@ -1,9 +1,10 @@
+import os
 import struct
 import time
 import logging
 import pickle
+import select
 import threading
-import socket
 import queue
 
 logger = logging.getLogger(__name__)
@@ -12,20 +13,19 @@ class StdClient(object):
 
     def __init__(self, fd):
         self.registered_method_table = {}
-        self.fd = fd
-        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock.settimeout(None)
+
+        read_file = "%s.out" % fd
+        self.read_fd = os.open(read_file, os.O_NONBLOCK | os.O_RDONLY)
+
+        write_file = "%s.in" % fd
+        self.write_fd = os.open(write_file, os.O_NONBLOCK | os.O_WRONLY)
+
         self.lock = threading.RLock()
-        self.is_closed = False
 
     def register_method(self, method_id, method):
-        if self.is_closed:
-            raise socket.error("Connection closed.")
         self.registered_method_table[method_id] = method
 
     def call_method(self, method_id, *args, **kwargs):
-        if self.is_closed:
-            raise socket.error("Connection closed.")
         try:
             self.lock.acquire()
             data = pickle.dumps({
@@ -33,45 +33,38 @@ class StdClient(object):
                 "args": args,
                 "kwargs": kwargs,
             })
-            self.sock.sendall(struct.pack('i', len(data)))
-            self.sock.sendall(data)
+            os.write(self.write_fd, struct.pack('i', len(data)))
+            os.write(self.write_fd, data)
         finally:
             self.lock.release()
 
     def connect(self):
-        if self.is_closed:
-            raise socket.error("Connection closed.")
         t1 = threading.Thread(target=self._read_task)
         t1.setDaemon(True)
         t1.start()
 
     def close(self):
-        self.is_closed = True
-        self.sock.close()
+        os.close(self.read_fd)
+        os.close(self.write_fd)
     
     def __del__(self):
         self.close()
 
 
     def _read_task(self):
-        try:
-            self.sock.connect(self.fd)
-            while True:
-                buffer = self.sock.recv(4)
-                if not buffer:
-                    break
-                length = struct.unpack('i', buffer)[0]
-                buffer = self.sock.recv(length)
-                if not buffer or len(buffer) != length:
-                    break
-                obj = pickle.loads(buffer)
-                method_id = obj["method_id"]
-                args = obj["args"]
-                kwargs = obj["kwargs"]
-                self.registered_method_table[method_id](*args, **kwargs)
-        except (FileNotFoundError, ConnectionRefusedError) as e:
-            logger.exception(e)
-        finally:
-            if not self.is_closed:
-                time.sleep(1)
-                self.connect()
+        while True:
+            rlist, _, _ =select.select([self.read_fd,],[],[], 60)
+            if not rlist:
+                continue
+            buff = os.read(self.read_fd, 4)
+            if not buff:
+                break
+            length = struct.unpack('i', buff)[0]
+            buff = os.read(self.read_fd, length)
+            if not buff or len(buff) != length:
+                break
+            obj = pickle.loads(buff)
+            method_id = obj["method_id"]
+            args = obj["args"]
+            kwargs = obj["kwargs"]
+            self.registered_method_table[method_id](*args, **kwargs)

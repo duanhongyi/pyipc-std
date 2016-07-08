@@ -1,9 +1,8 @@
 import os
-import queue
 import logging
 import pickle
 import struct
-import socket
+import select
 import threading
 
 
@@ -13,15 +12,20 @@ class StdServer(object):
 
     def __init__(self, fd):
         self.registered_method_table = {}
-        if os.path.exists(fd):  
-            os.unlink(fd) 
-        self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.server.bind(fd)     
-        self.server.listen(5) 
-        self.server.settimeout(None)
-        self.sock = None
-        self.lock = threading.RLock()
 
+        read_file = "%s.in" % fd
+        if os.path.exists(read_file):  
+            os.unlink(read_file) 
+        os.mkfifo(read_file)
+        self.read_fd = os.open(read_file, os.O_NONBLOCK | os.O_RDONLY)
+
+        write_file = "%s.out" % fd
+        if os.path.exists(write_file):  
+            os.unlink(write_file) 
+        os.mkfifo(write_file)
+        self.write_fd = os.open(write_file, os.O_NONBLOCK | os.O_RDWR)
+
+        self.lock = threading.RLock()
 
     def register_method(self, method_id, method):
         self.registered_method_table[method_id] = method
@@ -34,37 +38,33 @@ class StdServer(object):
                 "args": args,
                 "kwargs": kwargs,
             })
-            self.sock.sendall(struct.pack('i', len(data)))
-            self.sock.sendall(data)
+            os.write(self.write_fd, struct.pack('i', len(data)))
+            os.write(self.write_fd, data)
         finally:
             self.lock.release()
 
 
     def serve_forever(self):
         while True:
-            self.sock, _ = self.server.accept()
-            self.sock.settimeout(None)
-            try:
-                while True:
-                    buffer = self.sock.recv(4)
-                    if not buffer:
-                        break
-                    length = struct.unpack('i', buffer)[0] 
-                    buffer = self.sock.recv(length)
-                    if not buffer or len(buffer) != length:
-                        break
-                    obj = pickle.loads(buffer)
-                    method = obj["method_id"]
-                    args = obj["args"]
-                    kwargs = obj["kwargs"]
-                    self.registered_method_table[method](*args, **kwargs)
-            except BaseException as e:
-                logger.exception(e)
-            finally:
-                self.sock.close()
+            rlist, _, _ =select.select([self.read_fd,],[],[], 60)
+            if not rlist:
+                continue
+            buff = os.read(self.read_fd, 4)
+            if not buff:
+                break
+            length = struct.unpack('i', buff)[0] 
+            buff = os.read(self.read_fd, length)
+            if not buff or len(buff) != length:
+                break
+            obj = pickle.loads(buff)
+            method = obj["method_id"]
+            args = obj["args"]
+            kwargs = obj["kwargs"]
+            self.registered_method_table[method](*args, **kwargs)
 
     def close(self):
-        self.server.close()
+        os.close(self.read_fd)
+        os.close(self.write_fd)
     
     def __del__(self):
         self.close()
