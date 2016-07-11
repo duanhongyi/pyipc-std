@@ -52,7 +52,7 @@ class StdServer(object):
             if not buff:
                 break
             length = struct.unpack('i', buff)[0] 
-            if not select.select([self.read_fd,],[],[], 1)[0]:
+            if not select.select([self.read_fd,],[],[], 2)[0]:
                 break
             buff = os.read(self.read_fd, length)
             if not buff or len(buff) != length:
