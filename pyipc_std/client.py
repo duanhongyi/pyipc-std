@@ -91,6 +91,4 @@ class StdClient(object):
                     self.registered_method_table[method_id](*args, **kwargs)
             except BaseException as e:
                 logger.exception(e)
-            finally:
-                self.close()
             time.sleep(1)
