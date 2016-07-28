@@ -52,7 +52,7 @@ class StdClient(object):
         t1.setDaemon(True)
         t1.start()
 
-    def close(self):
+    def close_fd(self):
         try:
             if self.read_fd:
                 os.close(self.read_fd)
@@ -62,6 +62,9 @@ class StdClient(object):
                 del self.write_fd
         except:
             pass
+
+    def close(self):
+        self.close_fd()
         self.closed = True
     
     def __del__(self):
@@ -91,4 +94,6 @@ class StdClient(object):
                     self.registered_method_table[method_id](*args, **kwargs)
             except BaseException as e:
                 logger.exception(e)
+            finally:
+                self.close_fd()
             time.sleep(1)
