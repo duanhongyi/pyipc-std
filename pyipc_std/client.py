@@ -13,11 +13,16 @@ class StdClient(object):
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.settimeout(None)
         self.lock = threading.RLock()
+        self.is_closed = False
 
     def register_method(self, method_id, method):
+        if self.is_closed:
+            raise socket.error("Connection closed.")
         self.registered_method_table[method_id] = method
 
     def call_method(self, method_id, *args, **kwargs):
+        if self.is_closed:
+            raise socket.error("Connection closed.")
         try:
             self.lock.acquire()
             data = pickle.dumps({
@@ -31,12 +36,14 @@ class StdClient(object):
             self.lock.release()
 
     def connect(self):
-        self.sock.connect(self.fd)
+        if self.is_closed:
+            raise socket.error("Connection closed.")
         t1 = threading.Thread(target=self._read_task)
         t1.setDaemon(True)
         t1.start()
 
     def close(self):
+        self.is_closed = True
         self.sock.close()
     
     def __del__(self):
@@ -44,16 +51,21 @@ class StdClient(object):
 
 
     def _read_task(self):
-        while True:
-            buffer = self.sock.recv(4)
-            if not buffer:
-                break
-            length = struct.unpack('i', buffer)[0]
-            buffer = self.sock.recv(length)
-            if not buffer or len(buffer) != length:
-                break
-            obj = pickle.loads(buffer)
-            method_id = obj["method_id"]
-            args = obj["args"]
-            kwargs = obj["kwargs"]
-            self.registered_method_table[method_id](*args, **kwargs)
+        try:
+            self.sock.connect(self.fd)
+            while True:
+                buffer = self.sock.recv(4)
+                if not buffer:
+                    break
+                length = struct.unpack('i', buffer)[0]
+                buffer = self.sock.recv(length)
+                if not buffer or len(buffer) != length:
+                    break
+                obj = pickle.loads(buffer)
+                method_id = obj["method_id"]
+                args = obj["args"]
+                kwargs = obj["kwargs"]
+                self.registered_method_table[method_id](*args, **kwargs)
+        finally:
+            if not self.is_closed:
+                self.connect()
